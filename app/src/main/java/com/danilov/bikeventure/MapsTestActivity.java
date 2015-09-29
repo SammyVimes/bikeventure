@@ -1,16 +1,27 @@
 package com.danilov.bikeventure;
 
+import android.graphics.Color;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
 
+import com.danilov.bikeventure.core.maps.Coordinate;
+import com.danilov.bikeventure.core.service.ServiceConnector;
+import com.danilov.bikeventure.core.service.TrackingService;
+import com.danilov.bikeventure.core.tracking.Track;
+import com.danilov.bikeventure.core.tracking.TrackPoint;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 
-public class MapsTestActivity extends FragmentActivity implements OnMapReadyCallback {
+import java.util.ArrayList;
+import java.util.List;
+
+public class MapsTestActivity extends FragmentActivity implements OnMapReadyCallback, ServiceConnector.ServiceListener<TrackingService> {
 
     private GoogleMap mMap;
 
@@ -22,6 +33,7 @@ public class MapsTestActivity extends FragmentActivity implements OnMapReadyCall
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+        TrackingService.bindService(TrackingService.class, this, this);
     }
 
 
@@ -42,5 +54,45 @@ public class MapsTestActivity extends FragmentActivity implements OnMapReadyCall
         LatLng sydney = new LatLng(-34, 151);
         mMap.addMarker(new MarkerOptions().position(sydney).title("Marker in Sydney"));
         mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
+        mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(final LatLng latLng) {
+                if (service != null) {
+                    service.newPoint(new Coordinate(latLng.latitude, latLng.longitude));
+                    updateMap();
+                }
+            }
+        });
     }
+
+    private Polyline line = null;
+
+    private void updateMap() {
+        if (line != null) {
+            line.remove();
+        }
+        List<TrackPoint> points = service.getPoints();
+        PolylineOptions polylineOptions = new PolylineOptions();
+        for (TrackPoint point : points) {
+            polylineOptions.add(new LatLng(point.getLatitude(), point.getLongitude()));
+        }
+        polylineOptions.color(Color.RED);
+        line = mMap.addPolyline(polylineOptions);
+    }
+
+    private TrackingService service;
+    private Track track;
+
+    @Override
+    public void onServiceConnected(final TrackingService service) {
+        this.service = service;
+        track = new Track(System.currentTimeMillis());
+        service.newTrack(track);
+    }
+
+    @Override
+    public void onServiceDisconnected(final TrackingService service) {
+
+    }
+
 }
